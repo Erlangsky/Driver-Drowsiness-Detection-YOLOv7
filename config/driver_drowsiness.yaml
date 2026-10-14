@@ -1,0 +1,13 @@
+train: ./dataset/train/images
+val: ./dataset/val/images
+test: ./dataset/test/images
+
+nc: 6
+
+names:
+  - look_away
+  - natural
+  - phone
+  - rub_eye
+  - sleepy_eye
+  - yawn
