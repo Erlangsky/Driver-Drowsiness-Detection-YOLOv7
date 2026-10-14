@@ -84,9 +84,67 @@ py -3.10 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install compatible PyTorch and YOLOv7 dependencies in this environment. Consult the [YOLOv7 repository](https://github.com/WongKinYiu/yolov7) and [PyTorch installation guide](https://pytorch.org/get-started/locally/) for a build appropriate to your GPU/CPU. The original codebase may require legacy dependency versions.
+### 2. Install PyTorch and dependencies (Windows / Python 3.10)
 
-### 2. Obtain the trained model
+First, confirm that your virtual environment is active and upgrade pip:
+
+```powershell
+python --version
+python -m pip install --upgrade pip
+```
+
+**Choose one PyTorch installation option**, based on your computer. The versions below are a reproducible *legacy setup* for the original YOLOv7 codebase, rather than the newest PyTorch release.
+
+**Option A — NVIDIA GPU (CUDA 11.8 build):**
+
+Check your GPU and driver with `nvidia-smi`. If your NVIDIA GPU/driver supports this CUDA build, run:
+
+```powershell
+python -m pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118
+```
+
+**Option B — CPU only (no compatible NVIDIA GPU):**
+
+```powershell
+python -m pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu
+```
+
+> **Compatibility note:** CUDA support depends on both the GPU architecture and NVIDIA driver, not just having a 4 GB GPU. Newer GPUs may need a newer PyTorch/CUDA combination. If the above CUDA build does not support your device, select a supported install command from the [official PyTorch selector](https://pytorch.org/get-started/locally/) and check compatibility with the legacy YOLOv7 code. You normally do **not** need to install the entire CUDA Toolkit to use the prebuilt PyTorch wheel.
+
+Install additional dependencies commonly needed by the original YOLOv7 training/inference scripts:
+
+```powershell
+python -m pip install numpy==1.23.5 opencv-python==4.8.1.78 scipy==1.10.1 pandas==1.5.3 matplotlib==3.7.3 seaborn==0.12.2 protobuf==3.20.3
+python -m pip install Pillow PyYAML requests tqdm tensorboard psutil thop ipython "setuptools<81"
+```
+
+The repository's unpinned or legacy `requirements.txt` may resolve to a different dependency combination. Do not blindly reinstall it over a working environment; if extra packages are reported missing, install them individually.
+
+**Verify the installation:**
+
+```powershell
+python -c "import torch, torchvision, cv2; print('PyTorch:', torch.__version__); print('Torchvision:', torchvision.__version__); print('OpenCV:', cv2.__version__); print('CUDA available:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+Example output on a supported NVIDIA configuration:
+
+```text
+PyTorch: 2.0.1+cu118
+Torchvision: 0.15.2+cu118
+OpenCV: 4.8.1
+CUDA available: True
+Device: NVIDIA GeForce ...
+```
+
+If `CUDA available: False`, run inference with `--device cpu` and check the GPU driver/build if you expected CUDA. If PowerShell prevents activating `.venv`, you can allow activation for the current terminal only:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Obtain the trained model
+
 
 Download `best.pt` from this repository's `weights/` directory (or its GitHub Release, if distributed there), and place it at:
 
@@ -96,7 +154,7 @@ yolov7/weights/best.pt
 
 Create the `weights` directory if it does not exist.
 
-### 3. Detect objects in an image or folder
+### 4. Detect objects in an image or folder
 
 ```powershell
 python detect.py `
@@ -110,7 +168,7 @@ python detect.py `
 
 Replace `inference/images` with the path to your own image, video, or image folder. Results are saved under `runs/detect/`.
 
-### 4. Real-time webcam detection (built-in laptop camera)
+### 5. Real-time webcam detection (built-in laptop camera)
 
 Test the standard webcam first:
 
