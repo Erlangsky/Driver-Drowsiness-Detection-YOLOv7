@@ -12,37 +12,37 @@ Real-time object detection of driver behaviors associated with drowsiness and di
 - **License reported by the dataset:** CC BY 4.0
 - **Number of classes:** 6
 
-|  ID | Class        | Description                        |
-| --: | ------------ | ---------------------------------- |
-|   0 | `look_away`  | Driver looks away                  |
-|   1 | `natural`    | Normal driver behavior             |
-|   2 | `phone`      | Driver uses or holds a phone       |
-|   3 | `rub_eye`    | Driver rubs their eyes             |
-|   4 | `sleepy_eye` | Driver shows sleepy or closed eyes |
-|   5 | `yawn`       | Driver yawns                       |
+| ID | Class | Description |
+|---:|---|---|
+| 0 | `look_away` | Driver looks away |
+| 1 | `natural` | Normal driver behavior |
+| 2 | `phone` | Driver uses or holds a phone |
+| 3 | `rub_eye` | Driver rubs their eyes |
+| 4 | `sleepy_eye` | Driver shows sleepy or closed eyes |
+| 5 | `yawn` | Driver yawns |
 
 The class order must match the original annotation IDs exactly.
 
 ## Training configuration
 
-| Setting               | Value                            |
-| --------------------- | -------------------------------- |
-| Architecture          | YOLOv7 (original implementation) |
-| Pretrained checkpoint | `yolov7_training.pt`             |
-| Epochs                | 50                               |
-| Batch size            | 4                                |
-| Image size            | 640 × 640                        |
-| Classes               | 6                                |
-| Device                | NVIDIA CUDA GPU (`--device 0`)   |
-| Workers               | 0 (Windows-compatible setup)     |
+| Setting | Value |
+|---|---|
+| Architecture | YOLOv7 (original implementation) |
+| Pretrained checkpoint | `yolov7_training.pt` |
+| Epochs | 50 |
+| Batch size | 4 |
+| Image size | 640 × 640 |
+| Classes | 6 |
+| Device | NVIDIA CUDA GPU (`--device 0`) |
+| Workers | 0 (Windows-compatible setup) |
 
 ## Validation results (epoch 50)
 
-| Metric       |     Result |
-| ------------ | ---------: |
-| Precision    | **95.85%** |
-| Recall       | **90.76%** |
-| mAP@0.5      | **94.52%** |
+| Metric | Result |
+|---|---:|
+| Precision | **95.85%** |
+| Recall | **90.76%** |
+| mAP@0.5 | **94.52%** |
 | mAP@0.5:0.95 | **64.63%** |
 
 These values are from the **validation log at the final epoch** (`results.txt`), **not** an independent test-set evaluation. Performance on new drivers, lighting conditions, or cameras may differ. The model's `best.pt` checkpoint may correspond to a different epoch.
@@ -110,7 +110,9 @@ python detect.py `
 
 Replace `inference/images` with the path to your own image, video, or image folder. Results are saved under `runs/detect/`.
 
-### 4. Real-time webcam detection
+### 4. Real-time webcam detection (built-in laptop camera)
+
+Test the standard webcam first:
 
 ```powershell
 python detect.py `
@@ -123,12 +125,132 @@ python detect.py `
   --nosave
 ```
 
-- `--source 0`: default webcam. Try `1` or `2` if your Android phone appears as an additional camera.
-- `--device cpu`: runs without CUDA. Change to `--device 0` if compatible NVIDIA CUDA support is correctly installed.
-- `--view-img`: shows the live detection window.
-- `--nosave`: avoids recording webcam output.
+- `--source 0`: camera index 0 (typically the laptop camera, but this varies).
+- `--device cpu`: works without NVIDIA CUDA. Use `--device 0` for a correctly configured NVIDIA GPU.
+- `--view-img`: displays the detection window; `--nosave` avoids saving the live video.
+- Focus the preview window and press **Q** to exit, or press **Ctrl+C** in the terminal.
 
-To use a phone camera, connect it through **Iriun Webcam** or a similar utility and identify its Windows camera index. Run tests while stationary, not while driving.
+## Use an Android phone camera for real-time detection
+
+You can use an Android smartphone as the camera and run YOLOv7 **on the Windows laptop**. The phone only supplies the video stream; inference uses your laptop's CPU or GPU.
+
+### Step 1 — Install and connect Iriun Webcam
+
+1. Install **Iriun Webcam** on your Android phone and the **Iriun Webcam desktop app** on Windows: [iriun.com](https://iriun.com/).
+2. Open both applications and allow camera access on the phone.
+3. For the simplest setup, connect the phone and laptop to the **same Wi-Fi network**. Wait for the phone's camera preview to appear on the computer.
+4. A USB connection may also be possible depending on the Iriun version and device setup; follow Iriun's own USB instructions if you prefer a cable.
+5. Close Zoom, Teams, or other programs that might be using the Iriun camera exclusively.
+6. If Windows blocks camera access, check **Settings → Privacy & security → Camera**, and enable camera access for desktop apps.
+
+> Tip: When the connection is successful, Windows should expose the phone camera as a webcam device. This means YOLOv7 can use a numeric camera index such as `0`, `1`, or `2`.
+
+### Step 2 — Find the phone camera index
+
+In the YOLOv7 root directory, create a file named `check_camera.py`:
+
+```python
+import cv2
+
+for index in range(5):
+    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    if cap.isOpened():
+        ok, frame = cap.read()
+        if ok:
+            height, width = frame.shape[:2]
+            print(f"Camera index {index}: available ({width}x{height})")
+    cap.release()
+```
+
+Run it from the activated YOLOv7 Python environment:
+
+```powershell
+python check_camera.py
+```
+
+Example output (your indices can differ):
+
+```text
+Camera index 0: available (1280x720)
+Camera index 1: available (1920x1080)
+```
+
+To verify which index belongs to the phone, test each available index with a preview. You can create `preview_camera.py`:
+
+```python
+import cv2
+import sys
+
+index = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+if not cap.isOpened():
+    raise SystemExit(f"Could not open camera index {index}")
+
+try:
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            print("No frame received")
+            break
+        cv2.imshow(f"Camera index {index} - press Q to quit", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+finally:
+    cap.release()
+    cv2.destroyAllWindows()
+```
+
+Then try `python preview_camera.py 1` (or another index). Point the phone camera at an object and confirm the preview changes accordingly. Close the preview before starting detection.
+
+### Step 3 — Run YOLOv7 with the phone camera
+
+From within the **original YOLOv7 repository** with `weights/best.pt` in place:
+
+```powershell
+python detect.py `
+  --weights weights/best.pt `
+  --source 1 `
+  --img-size 640 `
+  --conf-thres 0.25 `
+  --iou-thres 0.45 `
+  --device 0 `
+  --view-img `
+  --nosave `
+  --name realtime_phone
+```
+
+**Important:** Replace `--source 1` with the actual Iriun camera index. Replace `--device 0` with `--device cpu` if CUDA is unavailable. If you are running inference directly from your original training project, your checkpoint may instead be at `runs/train/driver_drowsiness_yolov7/weights/best.pt`.
+
+The model detects these six classes: `look_away`, `natural`, `phone`, `rub_eye`, `sleepy_eye`, and `yawn`. When confidence is high enough, detections appear as labeled bounding boxes on the video.
+
+### Step 4 — If detection is slow
+
+Try a smaller inference size:
+
+```powershell
+python detect.py `
+  --weights weights/best.pt `
+  --source 1 `
+  --img-size 416 `
+  --conf-thres 0.25 `
+  --device 0 `
+  --view-img `
+  --nosave
+```
+
+This can improve speed but may reduce detection quality for small details. Close other heavy applications and consider a lower phone-camera resolution if needed.
+
+### Troubleshooting phone camera
+
+| Issue | What to try |
+|---|---|
+| Phone preview does not appear in Iriun | Confirm both apps are running, allow camera permissions, check the same Wi-Fi network or supported USB setup. |
+| YOLOv7 opens laptop camera instead | Change `--source` to the verified Iriun camera index. |
+| Cannot open webcam / black screen | Close other camera apps, check Windows camera permissions, and test with `preview_camera.py`. |
+| No bounding boxes | Ensure `best.pt` loads correctly, improve lighting, and optionally try `--conf-thres 0.10` for debugging. |
+| Low FPS | Try `--img-size 416`, use CUDA if configured, and close resource-heavy applications. |
+
+**Safety:** Test simulated driver behavior only while parked or seated safely, never while operating a moving vehicle. Do not use this experimental model as a safety-critical alert system.
 
 ## Dataset configuration for retraining
 
@@ -195,3 +317,4 @@ Replace `--device 0` with `--device cpu` if necessary. **Test-set scores are not
 
 - **YOLOv7:** [WongKinYiu/yolov7](https://github.com/WongKinYiu/yolov7)
 - **Dataset:** [Driver Drowsiness v2, DUT Learning, Roboflow Universe](https://universe.roboflow.com/dut-learning/driver-drowsiness-v2/dataset/2) (CC BY 4.0 according to the exported dataset metadata)
+
